@@ -1,0 +1,80 @@
+.datagrid {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-right: 10px;
+    margin-left: 10px;
+
+    overflow: hidden;
+}
+
+.datagrid .content {
+    flex-direction: column;
+
+    background-color: rgb(255, 255, 255);
+}
+
+.datagrid .col, .datagrid .row {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    margin-right: 0px;
+    margin-left: 0px;
+
+    padding-left: 0px;
+    padding-top: 0px;
+    padding-right: 0px;
+    padding-bottom: 0px;
+}
+
+.datagrid .col {
+    position: absolute;
+    position-top: 0px;
+    position-bottom: 0px;
+
+    border-color: rgb(160, 160, 160);
+    border-right-width: 1px;
+}
+
+.datagrid .row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+
+    position: relative;
+    position-left: 0px;
+    position-right: 0px;
+
+    border-color: rgb(160, 160, 160);
+    border-top-width: 1px;
+}
+
+.datagrid .cell {
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    -word-wrap: true;
+    -unity-word-wrap: true;
+
+    justify-content: space-between;
+    align-self: stretch;
+
+    margin-top: 0px;
+    margin-bottom: 0px;
+    margin-right: 0px;
+    margin-left: 0px;
+
+    padding-left: 4px;
+    padding-top: 2px;
+    padding-right: 2px;
+    padding-bottom: 4px;
+}
+
+.datagrid .cell:hover {
+    border-color: rgb(66, 133, 244);
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+}
+
+.datagrid .cell:focus {
+    background-color: #229;
+}
