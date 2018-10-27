@@ -53,6 +53,7 @@
     -word-wrap: true;
     -unity-word-wrap: true;
 
+    overflow: hidden;
     justify-content: space-between;
     align-self: stretch;
 
@@ -68,13 +69,21 @@
 }
 
 .datagrid .cell:hover {
-    border-color: rgb(66, 133, 244);
-    border-left-width: 2px;
-    border-right-width: 2px;
-    border-top-width: 2px;
-    border-bottom-width: 2px;
+    background-color: rgb(236, 243, 255);
 }
 
 .datagrid .cell:focus {
     background-color: #229;
+}
+
+.datagrid .header {
+    background-color: rgb(243, 243, 243);
+}
+
+.datagrid .unity-property-field {
+    position: absolute;
+}
+
+.datagrid .grid {
+    background-color: rgb(160, 160, 160);
 }

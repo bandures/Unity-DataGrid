@@ -28,7 +28,7 @@ public class DataGrid : VisualElement
         }
     }
 
-    public delegate VisualElement MakeCellDelegate(object data);
+    public delegate VisualElement MakeCellDelegate(object data, int column, int row);
 
     [Serializable]
     private class Column
@@ -125,20 +125,35 @@ public class DataGrid : VisualElement
         }
     }
 
+    public int AddIndexColumn(string name, float width, int afterColumn = -1)
+    {
+        MakeCellDelegate cellFunc = (object data, int column, int row) => {
+            var label = new Label { text = string.Format("{0}", row) };
+            label.AddToClassList("header");
+            return label;
+        };
+
+        return AddColumn(name, width, typeof(string), cellFunc, afterColumn);
+    }
+
     public int AddTextColumn(string name, float width, Func<object, string> accessor, int afterColumn = -1)
     {
-        MakeCellDelegate cellFunc = (object data) => { return new Label { text = accessor(data) }; };
+        MakeCellDelegate cellFunc = (object data, int column, int row) => {
+            return new Label { text = accessor(data) };
+            };
+
         return AddColumn(name, width, typeof(string), cellFunc, afterColumn);
     }
 
     public int AddPropertyColumn(string name, float width, Func<object, SerializedProperty> accessor, int afterColumn = -1)
     {
-        MakeCellDelegate cellFunc = (object data) => {
+        MakeCellDelegate cellFunc = (object data, int column, int row) => {
             var prop = accessor(data);
             var field = new PropertyField();
             field.BindProperty(prop);
             return field;
             };
+
         return AddColumn(name, width, typeof(SerializedProperty), cellFunc, afterColumn);
     }
 
@@ -164,7 +179,6 @@ public class DataGrid : VisualElement
             return;
 
         Debug.Log("OnSizeChanged!");
-        //ResizeHeight(evt.newRect.height);
     }
 
     private void OnPostLayout(GeometryChangedEvent evt)
@@ -175,9 +189,7 @@ public class DataGrid : VisualElement
         // Calculate total height after all child layout have been updated and size calculated
         float totalHeight = 0;
         foreach (var row in m_RowsCache)
-        {
             totalHeight += row.Row.layout.height;
-        }
 
         m_ScrollView.contentContainer.style.height = Math.Max(totalHeight, layout.height);
     }
@@ -197,46 +209,85 @@ public class DataGrid : VisualElement
         schedule.Execute(() => Refresh());
     }
 
+    /// 
+    /// Content layout generation
+    /// 
     protected void Refresh()
     {
         m_Dirty = false;
 
-        float position = 0;
-        foreach (var col in m_Columns)
-        {
-            var elem = new VisualElement();
-            elem.AddToClassList("col");
-            elem.style.width = 100;
-            elem.style.positionLeft = position;
-            m_ScrollView.contentContainer.Add(elem);
+        var header = new RowCache();
+        header.index = 0;
+        header.Row = CreateRowElement(m_ScrollView.contentContainer, 16);
+        header.RowElements = new List<VisualElement>();
+        m_RowsCache.Add(header);
 
-            position += 100;
-        }
+        CreateRowCells(header, null, 0, (_1, column, _3) => {
+            var cellElem = new Label(m_Columns[column].Name);
+            cellElem.AddToClassList("cell");
+            cellElem.AddToClassList("header");
+            return cellElem;
+        });
 
-        int index = 0;
+        int index = 1;
         m_RowsCache = new List<RowCache>();
         foreach (var rowData in m_DataProvider)
         {
             var row = new RowCache();
             row.index = index;
-            row.Row = new VisualElement();
-            row.Row.AddToClassList("row");
-            row.Row.style.minHeight = 16;
+            row.Row = CreateRowElement(m_ScrollView.contentContainer, 16);
             row.RowElements = new List<VisualElement>();
-
             m_RowsCache.Add(row);
-            m_ScrollView.contentContainer.Add(row.Row);
 
-            foreach (var col in m_Columns)
-            {
-                var cellElem = col.MakeCell(rowData);
-                cellElem.AddToClassList("cell");
-                cellElem.style.width = 100;
-                row.Row.Add(cellElem);
-                row.RowElements.Add(cellElem);
-            }
+            CreateRowCells(row, rowData, index);
 
             index++;
         }
+    }
+
+    private void CreateRowCells(RowCache row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
+    {
+        // Cells use Flex because we know cell width, but we don't know cell height.
+        // We let system calculate it, but it won't work with absolute positions
+
+        int colIndex = 0;
+        foreach (var col in m_Columns)
+        {
+            var makeCell = makeCellOverride == null ? col.MakeCell : makeCellOverride;
+
+            var cellElem = makeCell(data, colIndex, rowIndex);
+            cellElem.AddToClassList("cell");
+            cellElem.style.width = col.Width;
+
+            row.Row.Add(cellElem);
+            row.RowElements.Add(cellElem);
+
+            var grid = new VisualElement();
+            grid.AddToClassList("grid");
+            grid.style.width = 1;
+
+            row.Row.Add(grid);
+
+            colIndex++;
+        }
+    }
+
+    private VisualElement CreateColumnElement(VisualElement container, float position, float width)
+    {
+        var elem = new VisualElement();
+        elem.AddToClassList("col");
+        elem.style.width = width;
+        elem.style.positionLeft = position;
+        container.Add(elem);
+        return elem;
+    }
+
+    private VisualElement CreateRowElement(VisualElement container, float minHeight)
+    {
+        var elem = new VisualElement();
+        elem.AddToClassList("row");
+        elem.style.minHeight = minHeight;
+        container.Add(elem);
+        return elem;
     }
 }
