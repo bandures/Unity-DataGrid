@@ -24,31 +24,42 @@ public class DataGrid : VisualElement
         public override void Init(VisualElement ve, IUxmlAttributes bag, CreationContext cc)
         {
             base.Init(ve, bag, cc);
-            ((DataGrid)ve).itemHeight = m_ItemHeight.GetValueFromBag(bag, cc);
+            ((DataGrid)ve).ItemHeight = m_ItemHeight.GetValueFromBag(bag, cc);
         }
     }
 
+    public delegate VisualElement MakeCellDelegate(object data);
+
+    [Serializable]
+    private class Column
+    {
+        public string Name;
+        public float Width;
+
+        public Type DataType;
+        public MakeCellDelegate MakeCell;
+    }
+
+    class RowCache
+    {
+        public int index;
+        public VisualElement Row;
+        public List<VisualElement> RowElements;
+    }
+
+    private bool m_Dirty = false;
 
     private StyleValue<int> m_ItemHeight;
-    public StyleValue<int> itemHeight
-    {
-        get { return m_ItemHeight; }
-        set
-        {
-            m_ItemHeight = value;
-            //Refresh();
-        }
-    }
+    [SerializeField] private ScrollView m_ScrollView;
+    [SerializeField] private List<Column> m_Columns = new List<Column>();
+    [SerializeField] private IList m_DataProvider;
 
-    [SerializeField]
-    private float m_ScrollOffset;
+    // TODO: Keep cache of used and freed rows for reuse
+    private List<RowCache> m_RowsCache = new List<RowCache>();
 
-    private ScrollView m_ScrollView;
 
     public DataGrid()
     {
-        m_ScrollOffset = 0.0f;
-
         AddStyleSheetPath("datagrid-style");
         AddToClassList("datagrid");
 
@@ -68,44 +79,67 @@ public class DataGrid : VisualElement
         // Content content changed, need update ScrollView area
         m_ScrollView.contentContainer.RegisterCallback<GeometryChangedEvent>(OnPostLayout);
 
-        AddTextColumn("Test 1", 100);
-        AddTextColumn("Test 2", 10);
-        AddTextColumn("Test 3", 50);
-
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Test", "LONG STRING WITH SEPARATION OF TEST", "SHORT STRING" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Lorem Ipsum Venom Destruction All Hail Britania", "LongStringWithoutBreaksAndSpaces", "555 666 888" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "123", "432", "3412" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Test", "LONG STRING WITH SEPARATION OF TEST", "SHORT STRING" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Lorem Ipsum Venom Destruction All Hail Britania", "LongStringWithoutBreaksAndSpaces", "555 666 888" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "123", "432", "3412" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Test", "LONG STRING WITH SEPARATION OF TEST", "SHORT STRING" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Lorem Ipsum Venom Destruction All Hail Britania", "LongStringWithoutBreaksAndSpaces", "555 666 888" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "123", "432", "3412" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Test", "LONG STRING WITH SEPARATION OF TEST", "SHORT STRING" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "Lorem Ipsum Venom Destruction All Hail Britania", "LongStringWithoutBreaksAndSpaces", "555 666 888" } });
-        m_Rows.Add(new DataRow() { Data = new List<string> { "123", "432", "3412" } });
-        Refresh();
+        MarkDirty();
     }
 
-    class Column
+    public IList DataProvider
     {
-        public string Header;
-        public float MinWidth;
+        get { return m_DataProvider; }
+        set
+        {
+            m_DataProvider = value;
+            MarkDirty();
+        }
     }
 
-    class DataRow
+    public StyleValue<int> ItemHeight
     {
-        public IList Data;
-        public VisualElement Row;
+        get { return m_ItemHeight; }
+        set
+        {
+            m_ItemHeight = value;
+            MarkDirty();
+        }
     }
 
-    private List<Column> m_Columns = new List<Column>();
-    private List<DataRow> m_Rows = new List<DataRow>();
-
-    public void AddTextColumn(string header, float minWidth)
+    public int AddColumn(string name, float width, Type dataType, MakeCellDelegate MakeCell, int afterColumn = -1)
     {
-        m_Columns.Add(new Column() { Header = header, MinWidth = minWidth });
-        //Refresh();
+        if ((afterColumn != -1) && (afterColumn >= m_Columns.Count))
+        {
+            Debug.LogError($"Invalid parameter afterColumn = {afterColumn}");
+            return -1;
+        }
+
+        MarkDirty();
+
+        var data = new Column() { Name = name, Width = width, DataType = dataType, MakeCell = MakeCell };
+        if (afterColumn == -1)
+        {
+            m_Columns.Add(data);
+            return m_Columns.Count - 1;
+        }
+        else
+        {
+            m_Columns.Insert(afterColumn, data);
+            return afterColumn + 1;
+        }
+    }
+
+    public int AddTextColumn(string name, float width, Func<object, string> accessor, int afterColumn = -1)
+    {
+        MakeCellDelegate cellFunc = (object data) => { return new Label { text = accessor(data) }; };
+        return AddColumn(name, width, typeof(string), cellFunc, afterColumn);
+    }
+
+    public int AddPropertyColumn(string name, float width, Func<object, SerializedProperty> accessor, int afterColumn = -1)
+    {
+        MakeCellDelegate cellFunc = (object data) => {
+            var prop = accessor(data);
+            var field = new PropertyField();
+            field.BindProperty(prop);
+            return field;
+            };
+        return AddColumn(name, width, typeof(SerializedProperty), cellFunc, afterColumn);
     }
 
     /// 
@@ -138,8 +172,9 @@ public class DataGrid : VisualElement
         //if (evt.newRect.height == evt.oldRect.height)
             //return;
 
+        // Calculate total height after all child layout have been updated and size calculated
         float totalHeight = 0;
-        foreach (var row in m_Rows)
+        foreach (var row in m_RowsCache)
         {
             totalHeight += row.Row.layout.height;
         }
@@ -153,9 +188,18 @@ public class DataGrid : VisualElement
         elementStyle.ApplyCustomProperty("-unity-item-height", ref m_ItemHeight);
     }
 
+    protected void MarkDirty()
+    {
+        if (m_Dirty)
+            return;
+
+        m_Dirty = true;
+        schedule.Execute(() => Refresh());
+    }
+
     protected void Refresh()
     {
-        m_ScrollView.contentContainer.style.height = 100;
+        m_Dirty = false;
 
         float position = 0;
         foreach (var col in m_Columns)
@@ -169,21 +213,30 @@ public class DataGrid : VisualElement
             position += 100;
         }
 
-        foreach (var row in m_Rows)
+        int index = 0;
+        m_RowsCache = new List<RowCache>();
+        foreach (var rowData in m_DataProvider)
         {
+            var row = new RowCache();
+            row.index = index;
             row.Row = new VisualElement();
             row.Row.AddToClassList("row");
             row.Row.style.minHeight = 16;
+            row.RowElements = new List<VisualElement>();
+
+            m_RowsCache.Add(row);
             m_ScrollView.contentContainer.Add(row.Row);
 
-            foreach (var cell in row.Data)
+            foreach (var col in m_Columns)
             {
-                var cellElem = new Label();
-                cellElem.text = cell as string;
+                var cellElem = col.MakeCell(rowData);
                 cellElem.AddToClassList("cell");
                 cellElem.style.width = 100;
                 row.Row.Add(cellElem);
+                row.RowElements.Add(cellElem);
             }
+
+            index++;
         }
     }
 }
