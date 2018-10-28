@@ -87,3 +87,50 @@
 .datagrid .grid {
     background-color: rgb(160, 160, 160);
 }
+
+.datagrid .selection {
+    position: absolute;
+    position-top: 0px;
+    position-bottom: 0px;
+    position-left: 0px;
+    position-right: 0px;
+
+    border-color: rgb(66, 133, 244);
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+}
+
+.datagrid .selection > .drag-box {
+    width: 6px;
+    height: 6px;
+    position: absolute;
+    position-bottom: -3px;
+    position-right: -3px;
+    background-color: rgb(66, 133, 244);
+
+    border-color: rgb(255, 255, 255);
+    border-left-width: 1px;
+    border-right-width: 0px;
+    border-top-width: 1px;
+    border-bottom-width: 0px;
+
+    cursor: resize-up-left;
+}
+
+.datagrid .cell > .resize {
+    width: 6px;
+    position: absolute;
+    position-top: 0px;
+    position-bottom: 0px;
+    position-right: -2px;
+    background-color: rgb(66, 133, 244);
+    opacity: 0;
+
+    cursor: resize-horizontal;
+}
+
+.datagrid .cell > .resize:hover {
+    opacity: 1;
+}

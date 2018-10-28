@@ -40,6 +40,12 @@ public class DataGrid : VisualElement
         public MakeCellDelegate MakeCell;
     }
 
+    private class Cell
+    {
+        public object Data;
+        public Vector2Int Position;
+    }
+
     class RowCache
     {
         public int index;
@@ -50,11 +56,13 @@ public class DataGrid : VisualElement
     private bool m_Dirty = false;
 
     private StyleValue<int> m_ItemHeight;
-    [SerializeField] private ScrollView m_ScrollView;
     [SerializeField] private List<Column> m_Columns = new List<Column>();
     [SerializeField] private IList m_DataProvider;
+    [SerializeField] private Vector2Int m_SelectionPos = new Vector2Int(0, 0);
 
     // TODO: Keep cache of used and freed rows for reuse
+    private ScrollView m_ScrollView;
+    private VisualElement m_Selection;
     private List<RowCache> m_RowsCache = new List<RowCache>();
 
 
@@ -78,6 +86,10 @@ public class DataGrid : VisualElement
         m_ScrollView.contentContainer.RegisterCallback<KeyDownEvent>(OnKeyDown);
         // Content content changed, need update ScrollView area
         m_ScrollView.contentContainer.RegisterCallback<GeometryChangedEvent>(OnPostLayout);
+
+        var selectionTemplate = Resources.Load<VisualTreeAsset>("datagrid-selection");
+        m_Selection = selectionTemplate.CloneTree(null);
+        m_Selection.visible = false;
 
         MarkDirty();
     }
@@ -162,15 +174,59 @@ public class DataGrid : VisualElement
     /// 
     public void OnKeyDown(KeyDownEvent evt)
     {
-        Debug.Log("KeyDown!");
+        Debug.Log("OnKeyDown!");
+
+        switch (evt.keyCode)
+        {
+            case KeyCode.LeftArrow:
+                if (m_SelectionPos.x > 0)
+                    m_SelectionPos.x -= 1;
+                break;
+            case KeyCode.RightArrow:
+                if (m_SelectionPos.x + 1 < m_Columns.Count)
+                    m_SelectionPos.x += 1;
+                break;
+            case KeyCode.UpArrow:
+                if (m_SelectionPos.y > 0)
+                    m_SelectionPos.y -= 1;
+                break;
+            case KeyCode.DownArrow:
+                if (m_SelectionPos.y + 1 < m_DataProvider.Count)
+                    m_SelectionPos.y += 1;
+                break;
+            case KeyCode.Home:
+                m_SelectionPos.x = 0;
+                break;
+            case KeyCode.End:
+                m_SelectionPos.x = m_Columns.Count - 1;
+                break;
+        }
+
+        RefreshSelection();
     }
+
     private void OnClick(MouseDownEvent evt)
     {
-        Debug.Log("OnClick!");
+        var target = evt.currentTarget as VisualElement;
+        if (target == null)
+            return;
+
+        if (!target.ClassListContains("cell"))
+            return;
+
+        var cellData = target.userData as Cell;
+        if (cellData == null)
+            return;
+
+        m_SelectionPos = cellData.Position;
+        RefreshSelection();
+
+        evt.StopPropagation();
     }
+
     private void OnScroll(float offset)
     {
-        Debug.Log("OnScroll!");
+        //Debug.Log("OnScroll!");
     }
 
     private void OnSizeChanged(GeometryChangedEvent evt)
@@ -178,7 +234,7 @@ public class DataGrid : VisualElement
         if (evt.newRect.height == evt.oldRect.height)
             return;
 
-        Debug.Log("OnSizeChanged!");
+        //Debug.Log("OnSizeChanged!");
     }
 
     private void OnPostLayout(GeometryChangedEvent evt)
@@ -190,6 +246,8 @@ public class DataGrid : VisualElement
         float totalHeight = 0;
         foreach (var row in m_RowsCache)
             totalHeight += row.Row.layout.height;
+
+        //RefreshSelection();
 
         m_ScrollView.contentContainer.style.height = Math.Max(totalHeight, layout.height);
     }
@@ -214,7 +272,11 @@ public class DataGrid : VisualElement
     /// 
     protected void Refresh()
     {
+        if (m_DataProvider == null)
+            return;
+
         m_Dirty = false;
+        m_RowsCache = new List<RowCache>();
 
         var header = new RowCache();
         header.index = 0;
@@ -226,11 +288,15 @@ public class DataGrid : VisualElement
             var cellElem = new Label(m_Columns[column].Name);
             cellElem.AddToClassList("cell");
             cellElem.AddToClassList("header");
+
+            var resizeControl = new VisualElement();
+            resizeControl.AddToClassList("resize");
+            resizeControl.AddManipulator(new ResizeManipulator((float delta) => { m_Columns[column].Width += delta; MarkDirty(); } ));
+            cellElem.Add(resizeControl);
             return cellElem;
         });
 
         int index = 1;
-        m_RowsCache = new List<RowCache>();
         foreach (var rowData in m_DataProvider)
         {
             var row = new RowCache();
@@ -245,6 +311,26 @@ public class DataGrid : VisualElement
         }
     }
 
+    private void RefreshSelection()
+    {
+        if (m_DataProvider == null)
+            return;
+        if ((m_SelectionPos.x >= m_Columns.Count) || (m_SelectionPos.y >= m_RowsCache.Count))
+            return;
+
+        if (m_Selection.parent != null)
+            m_Selection.parent.Remove(m_Selection);
+
+        m_Selection.style.positionType = PositionType.Absolute;
+        m_Selection.style.positionLeft = 0;
+        m_Selection.style.positionRight = 0;
+        m_Selection.style.positionTop = 0;
+        m_Selection.style.positionBottom = 0;
+        m_Selection.visible = true;
+        var refElem = m_RowsCache[m_SelectionPos.y].RowElements[m_SelectionPos.x];
+        refElem.Add(m_Selection);
+    }
+
     private void CreateRowCells(RowCache row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
     {
         // Cells use Flex because we know cell width, but we don't know cell height.
@@ -256,8 +342,11 @@ public class DataGrid : VisualElement
             var makeCell = makeCellOverride == null ? col.MakeCell : makeCellOverride;
 
             var cellElem = makeCell(data, colIndex, rowIndex);
+            cellElem.name = string.Format("cell {0}-{1}", colIndex, rowIndex);
             cellElem.AddToClassList("cell");
             cellElem.style.width = col.Width;
+            cellElem.userData = new Cell() { Data = data, Position = new Vector2Int(colIndex, rowIndex)};
+            cellElem.RegisterCallback<MouseDownEvent>(OnClick);
 
             row.Row.Add(cellElem);
             row.RowElements.Add(cellElem);
@@ -289,5 +378,71 @@ public class DataGrid : VisualElement
         elem.style.minHeight = minHeight;
         container.Add(elem);
         return elem;
+    }
+
+    public class ResizeManipulator : Manipulator
+    {
+        bool hold = false;
+        Action<float> applyDelegate;
+
+        public ResizeManipulator(Action<float> _applyDelegate)
+        {
+            applyDelegate = _applyDelegate;
+        }
+
+        protected override void RegisterCallbacksOnTarget()
+        {
+            target.RegisterCallback<MouseDownEvent>(OnMouseDown);
+            target.RegisterCallback<MouseMoveEvent>(OnMouseMove);
+            target.RegisterCallback<MouseUpEvent>(OnMouseUp);
+            target.RegisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOutEvent);
+        }
+
+        protected override void UnregisterCallbacksFromTarget()
+        {
+            target.UnregisterCallback<MouseDownEvent>(OnMouseDown);
+            target.UnregisterCallback<MouseMoveEvent>(OnMouseMove);
+            target.UnregisterCallback<MouseUpEvent>(OnMouseUp);
+            target.UnregisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOutEvent);
+        }
+
+        private void OnMouseDown(MouseDownEvent e)
+        {
+            if (hold)
+            {
+                e.StopImmediatePropagation();
+                return;
+            }
+
+            if (target == null)
+                return;
+
+            hold = true;
+            MouseCaptureController.TakeMouseCapture(target);
+            e.StopPropagation();
+        }
+
+        private void OnMouseMove(MouseMoveEvent e)
+        {
+            if (hold)
+            {
+                e.StopPropagation();
+            }
+
+            applyDelegate(e.mouseDelta.x);
+        }
+
+        private void OnMouseUp(MouseUpEvent e)
+        {
+            hold = false;
+
+            MouseCaptureController.ReleaseMouseCapture(target);
+            e.StopPropagation();
+        }
+
+        void OnMouseCaptureOutEvent(MouseCaptureOutEvent e)
+        {
+            hold = false;
+        }
     }
 }
