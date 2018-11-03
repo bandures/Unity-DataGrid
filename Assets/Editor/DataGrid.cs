@@ -1,14 +1,14 @@
-﻿using UnityEngine;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 using UnityEditor;
 using UnityEditor.Experimental.UIElements;
 using UnityEngine.Experimental.UIElements;
 using UnityEngine.Experimental.UIElements.StyleEnums;
 using UnityEngine.Experimental.UIElements.StyleSheets;
-using System.Collections.Generic;
-using System.Collections;
-using System;
 
-public class DataGrid : VisualElement
+public partial class DataGrid : VisualElement
 {
     public new class UxmlFactory : UxmlFactory<DataGrid, UxmlTraits> { }
 
@@ -30,66 +30,66 @@ public class DataGrid : VisualElement
 
     public delegate VisualElement MakeCellDelegate(object data, int column, int row);
 
-    [Serializable]
-    private class Column
+    private class TableCell
+    {
+        public object Data;
+        public Vector2Int Position;
+    }
+
+    private class TableColumn
     {
         public string Name;
         public float Width;
 
         public Type DataType;
         public MakeCellDelegate MakeCell;
+
+        public List<VisualElement> Elements;
     }
 
-    private class Cell
-    {
-        public object Data;
-        public Vector2Int Position;
-    }
-
-    class RowCache
+    private class TableRow
     {
         public int index;
         public VisualElement Row;
-        public List<VisualElement> RowElements;
+
+        public List<VisualElement> Elements;
     }
 
     private bool m_Dirty = false;
 
     private StyleValue<int> m_ItemHeight;
-    [SerializeField] private List<Column> m_Columns = new List<Column>();
     [SerializeField] private IList m_DataProvider;
     [SerializeField] private Vector2Int m_SelectionPos = new Vector2Int(0, 0);
 
     // TODO: Keep cache of used and freed rows for reuse
+    private VisualElement m_Header;
     private ScrollView m_ScrollView;
     private VisualElement m_Selection;
-    private List<RowCache> m_RowsCache = new List<RowCache>();
+    private List<TableRow> m_Rows = new List<TableRow>();
+    private List<TableColumn> m_Columns = new List<TableColumn>();
 
 
     public DataGrid()
     {
+        m_Rows = new List<TableRow>();
+
         AddStyleSheetPath("datagrid-style");
         AddToClassList("datagrid");
 
-        m_ScrollView = new ScrollView();
-        m_ScrollView.StretchToParentSize();
-        m_ScrollView.stretchContentWidth = true;
-        m_ScrollView.horizontalScroller.valueChanged += OnScroll;
+        var template = Resources.Load<VisualTreeAsset>("datagrid-template");
+        template.CloneTree(this, null);
+
+        m_Header = this.Q("header");
+        m_ScrollView = this.Q<ScrollView>("content");
+        m_Selection = this.Q("selection");
+
         m_ScrollView.verticalScroller.valueChanged += OnScroll;
-        shadow.Add(m_ScrollView);
-
-        // Parent size changed, need update ScrollView area
-        RegisterCallback<GeometryChangedEvent>(OnSizeChanged);
-
-        m_ScrollView.contentContainer.AddToClassList("content");
+        m_ScrollView.horizontalScroller.valueChanged += OnScroll;
         m_ScrollView.contentContainer.RegisterCallback<MouseDownEvent>(OnClick);
         m_ScrollView.contentContainer.RegisterCallback<KeyDownEvent>(OnKeyDown);
-        // Content content changed, need update ScrollView area
-        m_ScrollView.contentContainer.RegisterCallback<GeometryChangedEvent>(OnPostLayout);
 
-        var selectionTemplate = Resources.Load<VisualTreeAsset>("datagrid-selection");
-        m_Selection = selectionTemplate.CloneTree(null);
         m_Selection.visible = false;
+        m_Selection.RemoveFromHierarchy();
 
         MarkDirty();
     }
@@ -124,7 +124,7 @@ public class DataGrid : VisualElement
 
         MarkDirty();
 
-        var data = new Column() { Name = name, Width = width, DataType = dataType, MakeCell = MakeCell };
+        var data = new TableColumn() { Name = name, Width = width, DataType = dataType, MakeCell = MakeCell, Elements = new List<VisualElement>() };
         if (afterColumn == -1)
         {
             m_Columns.Add(data);
@@ -214,8 +214,11 @@ public class DataGrid : VisualElement
         if (!target.ClassListContains("cell"))
             return;
 
-        var cellData = target.userData as Cell;
+        var cellData = target.userData as TableCell;
         if (cellData == null)
+            return;
+
+        if ((cellData.Position.x == 0) || (cellData.Position.y == 0))
             return;
 
         m_SelectionPos = cellData.Position;
@@ -227,29 +230,6 @@ public class DataGrid : VisualElement
     private void OnScroll(float offset)
     {
         //Debug.Log("OnScroll!");
-    }
-
-    private void OnSizeChanged(GeometryChangedEvent evt)
-    {
-        if (evt.newRect.height == evt.oldRect.height)
-            return;
-
-        //Debug.Log("OnSizeChanged!");
-    }
-
-    private void OnPostLayout(GeometryChangedEvent evt)
-    {
-        //if (evt.newRect.height == evt.oldRect.height)
-            //return;
-
-        // Calculate total height after all child layout have been updated and size calculated
-        float totalHeight = 0;
-        foreach (var row in m_RowsCache)
-            totalHeight += row.Row.layout.height;
-
-        //RefreshSelection();
-
-        m_ScrollView.contentContainer.style.height = Math.Max(totalHeight, layout.height);
     }
 
     protected override void OnStyleResolved(ICustomStyle elementStyle)
@@ -276,22 +256,26 @@ public class DataGrid : VisualElement
             return;
 
         m_Dirty = false;
-        m_RowsCache = new List<RowCache>();
 
-        var header = new RowCache();
+        TableRow header = new TableRow();
         header.index = 0;
-        header.Row = CreateRowElement(m_ScrollView.contentContainer, 16);
-        header.RowElements = new List<VisualElement>();
-        m_RowsCache.Add(header);
+        header.Row = CreateRowElement(m_Header, 16);
+        header.Elements = new List<VisualElement>();
+        m_Rows.Add(header);
 
-        CreateRowCells(header, null, 0, (_1, column, _3) => {
+        CreateRowCells(m_Rows[0], null, 0, (_1, column, _3) => {
             var cellElem = new Label(m_Columns[column].Name);
             cellElem.AddToClassList("cell");
             cellElem.AddToClassList("header");
 
             var resizeControl = new VisualElement();
             resizeControl.AddToClassList("resize");
-            resizeControl.AddManipulator(new ResizeManipulator((float delta) => { m_Columns[column].Width += delta; MarkDirty(); } ));
+            resizeControl.AddManipulator(new ResizeManipulator((float delta) => {
+                m_Columns[column].Width += delta;
+                foreach(var elem in m_Columns[column].Elements)
+                    elem.style.width = m_Columns[column].Width;
+                //MarkDirty();
+                } ));
             cellElem.Add(resizeControl);
             return cellElem;
         });
@@ -299,11 +283,11 @@ public class DataGrid : VisualElement
         int index = 1;
         foreach (var rowData in m_DataProvider)
         {
-            var row = new RowCache();
+            var row = new TableRow();
             row.index = index;
             row.Row = CreateRowElement(m_ScrollView.contentContainer, 16);
-            row.RowElements = new List<VisualElement>();
-            m_RowsCache.Add(row);
+            row.Elements = new List<VisualElement>();
+            m_Rows.Add(row);
 
             CreateRowCells(row, rowData, index);
 
@@ -315,7 +299,7 @@ public class DataGrid : VisualElement
     {
         if (m_DataProvider == null)
             return;
-        if ((m_SelectionPos.x >= m_Columns.Count) || (m_SelectionPos.y >= m_RowsCache.Count))
+        if ((m_SelectionPos.x >= m_Columns.Count) || (m_SelectionPos.y >= m_Rows.Count))
             return;
 
         if (m_Selection.parent != null)
@@ -327,11 +311,11 @@ public class DataGrid : VisualElement
         m_Selection.style.positionTop = 0;
         m_Selection.style.positionBottom = 0;
         m_Selection.visible = true;
-        var refElem = m_RowsCache[m_SelectionPos.y].RowElements[m_SelectionPos.x];
+        var refElem = m_Rows[m_SelectionPos.y].Elements[m_SelectionPos.x];
         refElem.Add(m_Selection);
     }
 
-    private void CreateRowCells(RowCache row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
+    private void CreateRowCells(TableRow row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
     {
         // Cells use Flex because we know cell width, but we don't know cell height.
         // We let system calculate it, but it won't work with absolute positions
@@ -345,11 +329,12 @@ public class DataGrid : VisualElement
             cellElem.name = string.Format("cell {0}-{1}", colIndex, rowIndex);
             cellElem.AddToClassList("cell");
             cellElem.style.width = col.Width;
-            cellElem.userData = new Cell() { Data = data, Position = new Vector2Int(colIndex, rowIndex)};
+            cellElem.userData = new TableCell() { Data = data, Position = new Vector2Int(colIndex, rowIndex)};
             cellElem.RegisterCallback<MouseDownEvent>(OnClick);
 
             row.Row.Add(cellElem);
-            row.RowElements.Add(cellElem);
+            row.Elements.Add(cellElem);
+            col.Elements.Add(cellElem);
 
             var grid = new VisualElement();
             grid.AddToClassList("grid");
@@ -359,16 +344,12 @@ public class DataGrid : VisualElement
 
             colIndex++;
         }
-    }
 
-    private VisualElement CreateColumnElement(VisualElement container, float position, float width)
-    {
-        var elem = new VisualElement();
-        elem.AddToClassList("col");
-        elem.style.width = width;
-        elem.style.positionLeft = position;
-        container.Add(elem);
-        return elem;
+        var expand = new VisualElement();
+        expand.AddToClassList("cell");
+        expand.AddToClassList("expand");
+        expand.style.width = 1;
+        row.Row.Add(expand);
     }
 
     private VisualElement CreateRowElement(VisualElement container, float minHeight)
@@ -378,71 +359,5 @@ public class DataGrid : VisualElement
         elem.style.minHeight = minHeight;
         container.Add(elem);
         return elem;
-    }
-
-    public class ResizeManipulator : Manipulator
-    {
-        bool hold = false;
-        Action<float> applyDelegate;
-
-        public ResizeManipulator(Action<float> _applyDelegate)
-        {
-            applyDelegate = _applyDelegate;
-        }
-
-        protected override void RegisterCallbacksOnTarget()
-        {
-            target.RegisterCallback<MouseDownEvent>(OnMouseDown);
-            target.RegisterCallback<MouseMoveEvent>(OnMouseMove);
-            target.RegisterCallback<MouseUpEvent>(OnMouseUp);
-            target.RegisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOutEvent);
-        }
-
-        protected override void UnregisterCallbacksFromTarget()
-        {
-            target.UnregisterCallback<MouseDownEvent>(OnMouseDown);
-            target.UnregisterCallback<MouseMoveEvent>(OnMouseMove);
-            target.UnregisterCallback<MouseUpEvent>(OnMouseUp);
-            target.UnregisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOutEvent);
-        }
-
-        private void OnMouseDown(MouseDownEvent e)
-        {
-            if (hold)
-            {
-                e.StopImmediatePropagation();
-                return;
-            }
-
-            if (target == null)
-                return;
-
-            hold = true;
-            MouseCaptureController.TakeMouseCapture(target);
-            e.StopPropagation();
-        }
-
-        private void OnMouseMove(MouseMoveEvent e)
-        {
-            if (hold)
-            {
-                e.StopPropagation();
-            }
-
-            applyDelegate(e.mouseDelta.x);
-        }
-
-        private void OnMouseUp(MouseUpEvent e)
-        {
-            hold = false;
-
-            MouseCaptureController.ReleaseMouseCapture(target);
-            e.StopPropagation();
-        }
-
-        void OnMouseCaptureOutEvent(MouseCaptureOutEvent e)
-        {
-            hold = false;
-        }
     }
 }

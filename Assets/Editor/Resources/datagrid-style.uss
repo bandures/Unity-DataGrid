@@ -5,9 +5,16 @@
     margin-left: 10px;
 
     overflow: hidden;
+
+    flex-direction: column;
 }
 
-.datagrid .content {
+.datagrid > #header {
+    background-color: rgb(243, 243, 243);
+}
+
+.datagrid > #content {
+    flex-grow: 1;
     flex-direction: column;
 
     background-color: rgb(255, 255, 255);
@@ -74,6 +81,10 @@
 
 .datagrid .cell:focus {
     background-color: #229;
+}
+
+.datagrid .expand {
+    flex-grow: 1;
 }
 
 .datagrid .header {
