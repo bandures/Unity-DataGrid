@@ -1,7 +1,7 @@
 <UXML xmlns:ui="UnityEngine.Experimental.UIElements" xmlns:ue="UnityEditor.Experimental.UIElements">
     <ui:VisualElement name="header">
     </ui:VisualElement>
-    <ui:ScrollView name="content" stretch-content-width="true">
+    <ui:ScrollView name="content" stretch-content-width="true" focusIndex="1">
     </ui:ScrollView>
     <ui:VisualElement class="selection" name="selection">
         <ui:VisualElement class="drag-box">

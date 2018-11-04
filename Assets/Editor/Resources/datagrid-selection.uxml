@@ -1,6 +1,0 @@
-<UXML xmlns:ui="UnityEngine.Experimental.UIElements">
-    <ui:VisualElement class="selection">
-        <ui:VisualElement class="drag-box">
-        </ui:VisualElement>
-    </ui:VisualElement>
-</UXML>

@@ -29,10 +29,14 @@ public class TestWindow : EditorWindow
         dataGrid.AddTextColumn("Name", 100, (object data) => { var go = data as GameObject; return go.name; });
 //        dataGrid.AddPropertyColumn("Object", 200, (object data) => { var so = new SerializedObject(data as UnityEngine.Object); return so; });
 
-        dataGrid.AddPropertyColumn("Position", 250, (object data) => {
+        dataGrid.AddPropertyColumn("Local Position", 250, (object data) => {
             var so = new SerializedObject((data as GameObject).transform);
             return so.FindProperty("m_LocalPosition");
             });
+        dataGrid.AddPropertyColumn("X", 100, (object data) => {
+            var so = new SerializedObject((data as GameObject).transform);
+            return so.FindProperty("m_LocalPosition.x");
+        });
 
 
         List<GameObject> roots = new List<GameObject>();

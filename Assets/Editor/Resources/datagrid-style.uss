@@ -20,12 +20,14 @@
     background-color: rgb(255, 255, 255);
 }
 
-.datagrid .col, .datagrid .row {
+.datagrid .col, .datagrid .row, .datagrid .cell, .datagrid .cellcontent {
     margin-top: 0px;
     margin-bottom: 0px;
     margin-right: 0px;
     margin-left: 0px;
+}
 
+.datagrid .col, .datagrid .row, .datagrid .cell {
     padding-left: 0px;
     padding-top: 0px;
     padding-right: 0px;
@@ -54,25 +56,24 @@
 }
 
 .datagrid .cell {
+    overflow: visible;
+}
+
+.datagrid .cellcontent {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-grow: 1;
+    flex-basis: 1;
 
     -word-wrap: true;
     -unity-word-wrap: true;
-
-    overflow: hidden;
-    justify-content: space-between;
-    align-self: stretch;
-
-    margin-top: 0px;
-    margin-bottom: 0px;
-    margin-right: 0px;
-    margin-left: 0px;
 
     padding-left: 4px;
     padding-top: 2px;
     padding-right: 2px;
     padding-bottom: 4px;
+
+    overflow: hidden;
 }
 
 .datagrid .cell:hover {
@@ -130,7 +131,7 @@
     cursor: resize-up-left;
 }
 
-.datagrid .cell > .resize {
+.datagrid .cell .resize {
     width: 6px;
     position: absolute;
     position-top: 0px;
@@ -144,4 +145,8 @@
 
 .datagrid .cell > .resize:hover {
     opacity: 1;
+}
+
+.datagrid FloatField {
+    background-image: none;
 }

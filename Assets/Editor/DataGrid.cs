@@ -7,6 +7,7 @@ using UnityEditor.Experimental.UIElements;
 using UnityEngine.Experimental.UIElements;
 using UnityEngine.Experimental.UIElements.StyleEnums;
 using UnityEngine.Experimental.UIElements.StyleSheets;
+using System.Linq;
 
 public partial class DataGrid : VisualElement
 {
@@ -71,8 +72,6 @@ public partial class DataGrid : VisualElement
 
     public DataGrid()
     {
-        m_Rows = new List<TableRow>();
-
         AddStyleSheetPath("datagrid-style");
         AddToClassList("datagrid");
 
@@ -85,8 +84,8 @@ public partial class DataGrid : VisualElement
 
         m_ScrollView.verticalScroller.valueChanged += OnScroll;
         m_ScrollView.horizontalScroller.valueChanged += OnScroll;
-        m_ScrollView.contentContainer.RegisterCallback<MouseDownEvent>(OnClick);
-        m_ScrollView.contentContainer.RegisterCallback<KeyDownEvent>(OnKeyDown);
+        m_ScrollView.RegisterCallback<MouseDownEvent>(OnClick);
+        m_ScrollView.RegisterCallback<KeyDownEvent>(OnKeyDown);
 
         m_Selection.visible = false;
         m_Selection.RemoveFromHierarchy();
@@ -161,12 +160,82 @@ public partial class DataGrid : VisualElement
     {
         MakeCellDelegate cellFunc = (object data, int column, int row) => {
             var prop = accessor(data);
-            var field = new PropertyField();
-            field.BindProperty(prop);
-            return field;
+            return CreatePropertyCell(prop);
             };
 
         return AddColumn(name, width, typeof(SerializedProperty), cellFunc, afterColumn);
+    }
+
+    private VisualElement CreatePropertyCell(SerializedProperty property)
+    {
+        var propertyType = property.propertyType;
+
+        switch (propertyType)
+        {
+            case SerializedPropertyType.Integer:
+                return BindPropertyCell(new IntegerField(), property);
+            case SerializedPropertyType.Boolean:
+                return BindPropertyCell(new Toggle(), property);
+            case SerializedPropertyType.Float:
+                return BindPropertyCell(new FloatField(), property);
+            case SerializedPropertyType.String:
+                return BindPropertyCell(new TextField(), property);
+            case SerializedPropertyType.Color:
+                return BindPropertyCell(new ColorField(), property);
+            case SerializedPropertyType.LayerMask:
+                return BindPropertyCell(new LayerMaskField(), property);
+            case SerializedPropertyType.Enum:
+                {
+                    var field = new PopupField<string>(property.enumDisplayNames.ToList(), property.enumValueIndex);
+                    field.index = property.enumValueIndex;
+                    return BindPropertyCell(field, property);
+                }
+            case SerializedPropertyType.Vector2:
+                return BindPropertyCell(new Vector2Field(), property);
+            case SerializedPropertyType.Vector3:
+                return BindPropertyCell(new Vector3Field(), property);
+            case SerializedPropertyType.Vector4:
+                return BindPropertyCell(new Vector4Field(), property);
+            case SerializedPropertyType.Rect:
+                return BindPropertyCell(new RectField(), property);
+            case SerializedPropertyType.Character:
+                {
+                    var field = new TextField();
+                    field.maxLength = 1;
+                    return BindPropertyCell(field, property);
+                }
+            case SerializedPropertyType.AnimationCurve:
+                return BindPropertyCell(new CurveField(), property);
+            case SerializedPropertyType.Bounds:
+                return BindPropertyCell(new BoundsField(), property);
+            case SerializedPropertyType.Gradient:
+                return BindPropertyCell(new GradientField(), property);
+            case SerializedPropertyType.Quaternion:
+                return null;
+            case SerializedPropertyType.ExposedReference:
+                return null;
+            case SerializedPropertyType.FixedBufferSize:
+                return null;
+            case SerializedPropertyType.Vector2Int:
+                return BindPropertyCell(new Vector2IntField(), property);
+            case SerializedPropertyType.Vector3Int:
+                return BindPropertyCell(new Vector3IntField(), property);
+            case SerializedPropertyType.RectInt:
+                return BindPropertyCell(new RectIntField(), property);
+            case SerializedPropertyType.BoundsInt:
+                return BindPropertyCell(new BoundsIntField(), property);
+            case SerializedPropertyType.Generic:
+            default:
+                return null;
+        }
+    }
+
+    private VisualElement BindPropertyCell<T>(T input, SerializedProperty property) where T : VisualElement, IBindable
+    {
+        //input.bindingPath = property.propertyPath;
+        input.name = "Input:" + property.propertyPath;
+        input.BindProperty(property);
+        return input;
     }
 
     /// 
@@ -174,7 +243,7 @@ public partial class DataGrid : VisualElement
     /// 
     public void OnKeyDown(KeyDownEvent evt)
     {
-        Debug.Log("OnKeyDown!");
+        //Debug.Log("OnKeyDown!");
 
         switch (evt.keyCode)
         {
@@ -255,8 +324,12 @@ public partial class DataGrid : VisualElement
         if (m_DataProvider == null)
             return;
 
+        // clear old state
         m_Dirty = false;
+        m_Rows = new List<TableRow>();
+        m_ScrollView.contentContainer.Clear();
 
+        // create header
         TableRow header = new TableRow();
         header.index = 0;
         header.Row = CreateRowElement(m_Header, 16);
@@ -265,7 +338,6 @@ public partial class DataGrid : VisualElement
 
         CreateRowCells(m_Rows[0], null, 0, (_1, column, _3) => {
             var cellElem = new Label(m_Columns[column].Name);
-            cellElem.AddToClassList("cell");
             cellElem.AddToClassList("header");
 
             var resizeControl = new VisualElement();
@@ -280,6 +352,7 @@ public partial class DataGrid : VisualElement
             return cellElem;
         });
 
+        // create rows
         int index = 1;
         foreach (var rowData in m_DataProvider)
         {
@@ -303,16 +376,22 @@ public partial class DataGrid : VisualElement
             return;
 
         if (m_Selection.parent != null)
+        {
+            m_Selection.parent.Q(className: "cellcontent").pickingMode = PickingMode.Ignore;
             m_Selection.parent.Remove(m_Selection);
+        }
 
         m_Selection.style.positionType = PositionType.Absolute;
         m_Selection.style.positionLeft = 0;
         m_Selection.style.positionRight = 0;
         m_Selection.style.positionTop = 0;
         m_Selection.style.positionBottom = 0;
+        m_Selection.pickingMode = PickingMode.Ignore;
         m_Selection.visible = true;
+
         var refElem = m_Rows[m_SelectionPos.y].Elements[m_SelectionPos.x];
         refElem.Add(m_Selection);
+        refElem.Q(className: "cellcontent").pickingMode = PickingMode.Position;
     }
 
     private void CreateRowCells(TableRow row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
@@ -325,16 +404,21 @@ public partial class DataGrid : VisualElement
         {
             var makeCell = makeCellOverride == null ? col.MakeCell : makeCellOverride;
 
-            var cellElem = makeCell(data, colIndex, rowIndex);
-            cellElem.name = string.Format("cell {0}-{1}", colIndex, rowIndex);
-            cellElem.AddToClassList("cell");
-            cellElem.style.width = col.Width;
-            cellElem.userData = new TableCell() { Data = data, Position = new Vector2Int(colIndex, rowIndex)};
-            cellElem.RegisterCallback<MouseDownEvent>(OnClick);
+            var cellContent = makeCell(data, colIndex, rowIndex);
+            cellContent.AddToClassList("cellcontent");
+            cellContent.pickingMode = rowIndex == 0 ? PickingMode.Position : PickingMode.Ignore; // CRAP
 
-            row.Row.Add(cellElem);
-            row.Elements.Add(cellElem);
-            col.Elements.Add(cellElem);
+            var cellFrame = new VisualElement();
+            cellFrame.name = string.Format("cell {0}-{1}", colIndex, rowIndex);
+            cellFrame.AddToClassList("cell");
+            cellFrame.style.width = col.Width;
+            cellFrame.userData = new TableCell() { Data = data, Position = new Vector2Int(colIndex, rowIndex)};
+            cellFrame.RegisterCallback<MouseDownEvent>(OnClick);
+            cellFrame.Add(cellContent);
+
+            row.Row.Add(cellFrame);
+            row.Elements.Add(cellFrame);
+            col.Elements.Add(cellFrame);
 
             var grid = new VisualElement();
             grid.AddToClassList("grid");
