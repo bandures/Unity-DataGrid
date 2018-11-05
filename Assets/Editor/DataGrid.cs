@@ -84,7 +84,6 @@ public partial class DataGrid : VisualElement
 
         m_ScrollView.verticalScroller.valueChanged += OnScroll;
         m_ScrollView.horizontalScroller.valueChanged += OnScroll;
-        m_ScrollView.RegisterCallback<MouseDownEvent>(OnClick);
         m_ScrollView.RegisterCallback<KeyDownEvent>(OnKeyDown);
 
         m_Selection.visible = false;
@@ -274,26 +273,57 @@ public partial class DataGrid : VisualElement
         RefreshSelection();
     }
 
-    private void OnClick(MouseDownEvent evt)
+    private bool IsTableCell(IEventHandler input)
     {
-        var target = evt.currentTarget as VisualElement;
+        var target = input as VisualElement;
         if (target == null)
-            return;
+            return false;
 
         if (!target.ClassListContains("cell"))
-            return;
+            return false;
 
         var cellData = target.userData as TableCell;
         if (cellData == null)
-            return;
+            return false;
 
         if ((cellData.Position.x == 0) || (cellData.Position.y == 0))
+            return false;
+
+        return true;
+    }
+
+    private void OnMouseUp(MouseUpEvent evt)
+    {
+        Debug.Log("Up!");
+
+        if (!IsTableCell(evt.currentTarget))
             return;
 
-        m_SelectionPos = cellData.Position;
-        RefreshSelection();
+        var clickPos = ((evt.currentTarget as VisualElement).userData as TableCell).Position;  // CRAP
+        if (m_SelectionPos != clickPos)
+        {
+            Debug.Log("Stop!");
+            m_SelectionPos = clickPos;
+            RefreshSelection();
+            evt.StopImmediatePropagation();
+        }
+    }
 
-        evt.StopPropagation();
+    private void OnMouseDown(MouseDownEvent evt)
+    {
+        Debug.Log("Down: " + evt.currentTarget + " - " + evt.target);
+
+        if (!IsTableCell(evt.currentTarget))
+            return;
+
+        var clickPos = ((evt.currentTarget as VisualElement).userData as TableCell).Position;  // CRAP
+        if (m_SelectionPos != clickPos)
+        {
+            Debug.Log("Stop!");
+            //evt.StopImmediatePropagation();
+            evt.StopPropagation();
+            MouseCaptureController.TakeMouseCapture(evt.currentTarget);
+        }
     }
 
     private void OnScroll(float offset)
@@ -377,7 +407,8 @@ public partial class DataGrid : VisualElement
 
         if (m_Selection.parent != null)
         {
-            m_Selection.parent.Q(className: "cellcontent").pickingMode = PickingMode.Ignore;
+            //m_Selection.parent.Q(className: "cellcontent").pickingMode = PickingMode.Ignore;
+            //m_Selection.parent.Q(className: "cellcontent").SetEnabled(false);
             m_Selection.parent.Remove(m_Selection);
         }
 
@@ -391,7 +422,8 @@ public partial class DataGrid : VisualElement
 
         var refElem = m_Rows[m_SelectionPos.y].Elements[m_SelectionPos.x];
         refElem.Add(m_Selection);
-        refElem.Q(className: "cellcontent").pickingMode = PickingMode.Position;
+        //refElem.Q(className: "cellcontent").pickingMode = PickingMode.Position;
+        //refElem.Q(className: "cellcontent").SetEnabled(true);
     }
 
     private void CreateRowCells(TableRow row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
@@ -406,14 +438,16 @@ public partial class DataGrid : VisualElement
 
             var cellContent = makeCell(data, colIndex, rowIndex);
             cellContent.AddToClassList("cellcontent");
-            cellContent.pickingMode = rowIndex == 0 ? PickingMode.Position : PickingMode.Ignore; // CRAP
+            //cellContent.SetEnabled(rowIndex == 0 ? true : false);
+            //cellContent.pickingMode = rowIndex == 0 ? PickingMode.Position : PickingMode.Ignore; // CRAP
 
             var cellFrame = new VisualElement();
             cellFrame.name = string.Format("cell {0}-{1}", colIndex, rowIndex);
             cellFrame.AddToClassList("cell");
             cellFrame.style.width = col.Width;
             cellFrame.userData = new TableCell() { Data = data, Position = new Vector2Int(colIndex, rowIndex)};
-            cellFrame.RegisterCallback<MouseDownEvent>(OnClick);
+            cellFrame.RegisterCallback<MouseUpEvent>(OnMouseUp, TrickleDown.TrickleDown);
+            cellFrame.RegisterCallback<MouseDownEvent>(OnMouseDown, TrickleDown.TrickleDown);
             cellFrame.Add(cellContent);
 
             row.Row.Add(cellFrame);
