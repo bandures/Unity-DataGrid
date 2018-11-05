@@ -1,0 +1,81 @@
+<UXML xmlns:ui="UnityEngine.Experimental.UIElements" xmlns:ue="UnityEditor.Experimental.UIElements">
+<ui:Template name="unq-id" path="cheat-sheet-template"/>
+
+<ui:ScrollView name="Root" stretch-content-width="true" class="root-view">
+    <ui:Box name="Engine" class="show-group">
+        <ui:Box name="Engine" class="show-group">
+            <ui:VisualElement name="Name" class="Class" focusIndex="1"> </ui:VisualElement>
+        </ui:Box>
+
+        <ui:Box name="Base elements" class="show-group">
+            <ui:Image name="icon" class="elem"/>
+            <ui:Label name="Label" text="Label Text" class="elem"/>
+            <ui:TextElement name="TextElement" text="TextElement Text" class="elem"/>
+            <ui:Box name="Box" class="elem"></ui:Box>
+        </ui:Box>
+
+        <ui:Box name="Controls" class="show-group">
+            <ui:Button name="Button" text="Button Text" class="elem"/>
+            <ui:Toggle name="Toggle" label="Toggle button" value="true"/>
+            <ui:Slider name="Slider" text="Button Text" class="elem" low-value="0" high-value="100" direction="Horizontal"/>
+            <ui:SliderInt name="SliderInt" text="Button Text" class="elem" low-value="0" high-value="10" direction="Horizontal"/>
+            <ui:MinMaxSlider name="MinMaxSlider" text="Button Text" class="elem" low-limit="0" high-limit="100" min-value="10" max-value="90" direction="Horizontal"/>
+        </ui:Box>
+
+        <ui:Box name="Views" class="show-group">
+            <ui:ListView name="ListView" class="elem"/>
+            <ui:ScrollView name="ScrollView" class="elem"/>
+        </ui:Box>
+
+        <ui:Box name="Complex" class="show-group">
+            <ui:Foldout name="Foldout" text="Button Text" class="elem"/>
+
+            <ui:Instance template="unq-id" class="elem"/>
+        </ui:Box>
+
+    </ui:Box>
+
+    <ui:Box name="Editor" class="show-group">
+        <ui:Box name="Fields" class="show-group">
+            <ue:PropertyControl value-type= "long" name = "labelIntegerField" class = "labelIntegerField" label = "Sides" value = "0"/>
+            <ue:PropertyField name="Button" text="Button Text" class="elem"/>
+            <ue:IntegerField name="Button" text="Button Text" class="elem"/>
+            <ue:LongField name="Button" text="Button Text" class="elem"/>
+            <ue:FloatField name="Button" text="Button Text" class="elem"/>
+            <ue:DoubleField name="Button" text="Button Text" class="elem"/>
+            <ue:Vector2Field name="Button" text="Button Text" class="elem"/>
+            <ue:Vector2IntField name="Button" text="Button Text" class="elem"/>
+            <ue:Vector3Field name="Button" text="Button Text" class="elem"/>
+            <ue:Vector3IntField name="Button" text="Button Text" class="elem"/>
+            <ue:Vector4Field name="Button" text="Button Text" class="elem"/>
+            <ue:RectField name="Button" text="Button Text" class="elem"/>
+            <ue:RectIntField name="Button" text="Button Text" class="elem"/>
+            <ue:BoundsField name="Button" text="Button Text" class="elem"/>
+            <ue:BoundsIntField name="Button" text="Button Text" class="elem"/>
+            <ue:ColorField name="Button" text="Button Text" class="elem"/>
+            <ue:CurveField name="Button" text="Button Text" class="elem"/>
+            <ue:GradientField name="Button" text="Button Text" class="elem"/>
+            <ue:ObjectField name="Button" text="Button Text" class="elem"/>
+            <ue:InspectorElement name="Button" text="Button Text" class="elem"/>
+            <ue:MaskField name="Button" text="Button Text" class="elem"/>
+            <ue:LayerField name="Button" text="Button Text" class="elem"/>
+            <ue:LayerMaskField name="Button" text="Button Text" class="elem"/>
+            <ue:TagField name="Button" text="Button Text" class="elem"/>
+        </ui:Box>
+
+        <ui:Box name="Toolbar" class="show-group">
+            <ue:Toolbar name="Button" text="Button Text" class="elem"/>
+            <ue:ToolbarButton name="Button" text="Button Text" class="elem"/>
+            <ue:ToolbarToggle name="Button" text="Button Text" class="elem"/>
+            <ue:ToolbarMenu name="Button" text="Button Text" class="elem"/>
+            <ue:ToolbarSearchField name="Button" text="Button Text" class="elem"/>
+            <ue:ToolbarSpacer name="Button" text="Button Text" class="elem"/>
+            <ue:ToolbarFlexSpacer name="Button" text="Button Text" class="elem"/>
+        </ui:Box>
+    
+
+        <ue:VisualSplitter />
+
+    </ui:Box>
+</ui:ScrollView>
+</UXML>

@@ -1,0 +1,6 @@
+<UXML xmlns:ui="UnityEngine.Experimental.UIElements" xmlns:ue="UnityEditor.Experimental.UIElements" xmlns:gv="UnityEditor.Experimental.UIElements.GraphView">
+    <ui:Box name="Template" class="group inline">
+        <ui:Label name="Label" text="Template Lavel" class="elem"/>
+        <ui:Button name="Button" text="Template Button" class="elem"/>
+    </ui:Box>
+</UXML>

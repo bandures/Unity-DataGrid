@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 public class TestWindow : EditorWindow
 {
-    [MenuItem("Test/DataGrid _%#D")]
+    [MenuItem("UI/DataGrid _%#D")]
     public static void ShowWindow()
     {
         var window = GetWindow<TestWindow>();

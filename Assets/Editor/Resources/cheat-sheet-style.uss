@@ -1,0 +1,28 @@
+.root-view {
+    flex-grow: 1;
+    flex-basis: 1;
+}
+
+.show-group {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-right: 10px;
+    margin-left: 10px;
+
+    overflow: hidden;
+
+    flex-direction: column;
+}
+
+.elem {
+    margin-top: 2px;
+    margin-bottom: 2px;
+    margin-right: 2px;
+    margin-left: 2px;
+
+    min-height: 16px;
+}
+
+.inline {
+    flex-direction: row;
+}

@@ -231,7 +231,6 @@ public partial class DataGrid : VisualElement
 
     private VisualElement BindPropertyCell<T>(T input, SerializedProperty property) where T : VisualElement, IBindable
     {
-        //input.bindingPath = property.propertyPath;
         input.name = "Input:" + property.propertyPath;
         input.BindProperty(property);
         return input;
