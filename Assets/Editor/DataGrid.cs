@@ -294,35 +294,29 @@ public partial class DataGrid : VisualElement
 
     private void OnMouseUp(MouseUpEvent evt)
     {
-        Debug.Log("Up!");
-
         if (!IsTableCell(evt.currentTarget))
             return;
 
         var clickPos = ((evt.currentTarget as VisualElement).userData as TableCell).Position;  // CRAP
         if (m_SelectionPos != clickPos)
         {
-            Debug.Log("Stop!");
             m_SelectionPos = clickPos;
             RefreshSelection();
-            evt.StopImmediatePropagation();
+            evt.StopPropagation();
+            evt.PreventDefault();
         }
     }
 
     private void OnMouseDown(MouseDownEvent evt)
     {
-        Debug.Log("Down: " + evt.currentTarget + " - " + evt.target);
-
         if (!IsTableCell(evt.currentTarget))
             return;
 
         var clickPos = ((evt.currentTarget as VisualElement).userData as TableCell).Position;  // CRAP
         if (m_SelectionPos != clickPos)
         {
-            Debug.Log("Stop!");
-            //evt.StopImmediatePropagation();
             evt.StopPropagation();
-            MouseCaptureController.TakeMouseCapture(evt.currentTarget);
+            evt.PreventDefault();
         }
     }
 
@@ -376,7 +370,6 @@ public partial class DataGrid : VisualElement
                 m_Columns[column].Width += delta;
                 foreach(var elem in m_Columns[column].Elements)
                     elem.style.width = m_Columns[column].Width;
-                //MarkDirty();
                 } ));
             cellElem.Add(resizeControl);
             return cellElem;
@@ -406,11 +399,7 @@ public partial class DataGrid : VisualElement
             return;
 
         if (m_Selection.parent != null)
-        {
-            //m_Selection.parent.Q(className: "cellcontent").pickingMode = PickingMode.Ignore;
-            //m_Selection.parent.Q(className: "cellcontent").SetEnabled(false);
             m_Selection.parent.Remove(m_Selection);
-        }
 
         m_Selection.style.positionType = PositionType.Absolute;
         m_Selection.style.positionLeft = 0;
@@ -422,8 +411,6 @@ public partial class DataGrid : VisualElement
 
         var refElem = m_Rows[m_SelectionPos.y].Elements[m_SelectionPos.x];
         refElem.Add(m_Selection);
-        //refElem.Q(className: "cellcontent").pickingMode = PickingMode.Position;
-        //refElem.Q(className: "cellcontent").SetEnabled(true);
     }
 
     private void CreateRowCells(TableRow row, object data, int rowIndex, MakeCellDelegate makeCellOverride = null)
@@ -438,8 +425,6 @@ public partial class DataGrid : VisualElement
 
             var cellContent = makeCell(data, colIndex, rowIndex);
             cellContent.AddToClassList("cellcontent");
-            //cellContent.SetEnabled(rowIndex == 0 ? true : false);
-            //cellContent.pickingMode = rowIndex == 0 ? PickingMode.Position : PickingMode.Ignore; // CRAP
 
             var cellFrame = new VisualElement();
             cellFrame.name = string.Format("cell {0}-{1}", colIndex, rowIndex);
